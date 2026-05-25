@@ -1165,12 +1165,12 @@ function makePDF(items) {
     if(idx > 0) doc.addPage();
 
     // Dark professional header band
-    doc.setFillColor(26,26,24);
+    doc.setFillColor(180, 16, 46);
     doc.rect(0, 0, 210, 22, 'F');
     doc.setTextColor(245,242,236);
     doc.setFont('times','bold');
     doc.setFontSize(14);
-    doc.text('RTO Assessment Feedback Report', margin, 13);
+    doc.text('Micro Assessment Feedback', margin, 13);
     doc.setFont('courier','normal');
     doc.setFontSize(8);
     doc.text(new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'long',year:'numeric'}), W-margin, 13, {align:'right'});
