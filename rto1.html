@@ -751,12 +751,13 @@ async function filesToBase64Pages(files) {
 
 // ── Gemini call ────────────────────────────────────────────────────────────
 async function geminiVision(systemPrompt, imagePages) {
-  const parts = [{text: systemPrompt}];
+  const parts = [];
+  if(systemPrompt) parts.push({text: systemPrompt});
   for(const b64 of imagePages) {
     parts.push({inline_data: {mime_type:'image/jpeg', data: b64}});
   }
   const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview:generateContent?key=${API_KEY}`,
     {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -993,30 +994,7 @@ async function generateAll() {
   document.getElementById('step3-num').classList.add('done');
 }
 
-// ── Feedback text-only API call (no image) ─────────────────────────────────
-// Override geminiVision to handle text-only calls
-const _geminiVision = geminiVision;
-async function geminiVision(systemPrompt, imagePages) {
-  const parts = [];
-  if(systemPrompt) parts.push({text: systemPrompt});
-  for(const b64 of imagePages) {
-    parts.push({inline_data: {mime_type:'image/jpeg', data: b64}});
-  }
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
-    {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({contents:[{parts}]})
-    }
-  );
-  if(!resp.ok) {
-    const err = await resp.json();
-    throw new Error(err.error?.message || 'Gemini API error ' + resp.status);
-  }
-  const data = await resp.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-}
+
 
 // ── Output ─────────────────────────────────────────────────────────────────
 function copyFeedback() {
