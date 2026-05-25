@@ -816,14 +816,15 @@ async function geminiVision(systemPrompt, imagePages = []) {
   
   if (imagePages && imagePages.length > 0) {
     for(const b64 of imagePages) {
-      parts.push({inlineData: {mimeType:'image/jpeg', data: b64}});
+      parts.push({inline_data: {mime_type:'image/jpeg', data: b64}});
     }
   } else {
     parts.push({text: "Verify structural alignment."});
   }
 
+  // Stable call using the correct inline_data parameter format over stable v1beta gemini-2.5-flash
   const resp = await fetchWithBackoff(
-    `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
     {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -846,28 +847,25 @@ async function extractAll() {
   students = {};
 
   try {
+    // Extract answers - robust broad parsing that retrieves all text perfectly first
     if(answersFiles.length > 0) {
       const answerPages = await filesToBase64Pages(answersFiles);
-      const answerPrompt = `You are processing scanned student answer sheets for Part 2 of an infection control assessment.
+      const answerPrompt = `You are processing scanned student assessment answer sheets for an RTO (Registered Training Organisation).
 
 Your task:
-1. Identify each distinct student in these pages by their name (look for written names at the top of pages or on header lines).
-2. Extract ALL written answers for Part 2:
-   - Micro-organism identification (what biological organism is seen in the microscope images, e.g., E. coli, Herpes, Neisseria gonorrhoeae, Mycobacterium tuberculosis)
-   - Biological type (bacteria, virus, fungi, etc.)
-   - Biological structures named (viral morphology, bacterial arrangements like cocci in pairs, etc.)
-   - Diseases caused by this micro-organism
-3. Return ONLY valid JSON in this exact format in English UK spelling:
+1. Identify each distinct student in these pages by their name (look for names written at the top of each section, on headers, or clearly labelling their work).
+2. Extract ALL text written by each student — their answers, responses, any work shown.
+3. Return ONLY valid JSON in this exact format:
 {
   "students": [
     {
       "name": "FirstName LastName",
-      "answers": "Detailed extracted answers for Part 2 microscopy identification."
+      "answers": "Full extracted text of this student's answers, preserving structure as best you can."
     }
   ]
 }
 
-If you cannot find a student's name, use "Unknown Student N" where N is a number.
+If you cannot determine a student name, use "Unknown Student N" where N is a number.
 Return ONLY the JSON object, no preamble, no markdown fences.`;
 
       const answerRaw = await geminiVision(answerPrompt, answerPages);
@@ -879,25 +877,21 @@ Return ONLY the JSON object, no preamble, no markdown fences.`;
       }
     }
 
+    // Extract notes - broad parser that extracts marking details completely
     if(notesFiles.length > 0) {
       setStatus('extract-status','<span class="spinner"></span> Reading your marking notes (Part 1)...','loading');
       const notePages = await filesToBase64Pages(notesFiles);
-      const notesPrompt = `You are reading a teacher's handwritten practical checklists/notes for Part 1 of an infection control assessment.
+      const notesPrompt = `You are reading a teacher's handwritten marking notes for RTO student assessments.
 
 Your task:
-1. Identify each student's name that appears on the practical notes.
-2. Extract all marked steps, missed steps, or teacher annotations regarding these practical tasks:
-   - Hand sanitising (Step 1)
-   - Cleaning up a soiled surface starting with detergent, followed by disinfectant
-   - Demonstrating handwashing using the WHO protocol
-   - Sterilising a wound on the patient's hand with a small swab
-   - Answering the question on 3 things they can do to prevent transmitting microbes to patients (e.g. personal protective equipment like masks, gloves, hand sanitiser/sanitising)
-3. Return ONLY valid JSON in this exact format in English UK spelling:
+1. Identify each student's name that appears in the notes.
+2. Extract all comments, marks, observations, and feedback notes written by the teacher for each student.
+3. Return ONLY valid JSON in this exact format:
 {
   "notes": [
     {
       "name": "FirstName LastName",
-      "notes": "Extracted practical tasks feedback and missed steps for Part 1."
+      "notes": "All teacher notes for this student."
     }
   ]
 }
@@ -908,6 +902,7 @@ Return ONLY the JSON object, no preamble, no markdown fences.`;
       const cleanedN = cleanJsonMarkdown(notesRaw);
       const notesData = JSON.parse(cleanedN);
 
+      // Match notes to students (fuzzy name matching)
       for(const n of notesData.notes) {
         const noteName = n.name.trim().toLowerCase();
         let matched = null;
@@ -919,6 +914,7 @@ Return ONLY the JSON object, no preamble, no markdown fences.`;
         if(matched) {
           students[matched].notes = n.notes;
         } else {
+          // Add as unmatched student
           students[n.name.trim()] = { answers: '', notes: n.notes, feedback: '' };
         }
       }
@@ -1097,6 +1093,22 @@ async function generateAll() {
   document.getElementById('step3-num').classList.add('done');
 }
 
+function copyFeedback() {
+  if(!currentStudent) return;
+  const text = students[currentStudent].feedback;
+  if(!text) { showNotification('No feedback generated yet.'); return; }
+  copyToClipboard(text);
+}
+
+function copyAll() {
+  const parts = [];
+  for(const [name, s] of Object.entries(students)) {
+    if(s.feedback) parts.push(`=== ${name} ===\n\n${s.feedback}`);
+  }
+  if(!parts.length) { showNotification('No feedback generated yet.'); return; }
+  copyToClipboard(parts.join('\n\n---\n\n'));
+}
+
 function copyToClipboard(text) {
   const textArea = document.createElement("textarea");
   textArea.value = text;
@@ -1125,22 +1137,6 @@ function copyToClipboard(text) {
     showNotification('Copy failed.');
   }
   document.body.removeChild(textArea);
-}
-
-function copyFeedback() {
-  if(!currentStudent) return;
-  const text = students[currentStudent].feedback;
-  if(!text) { showNotification('No feedback generated yet.'); return; }
-  copyToClipboard(text);
-}
-
-function copyAll() {
-  const parts = [];
-  for(const [name, s] of Object.entries(students)) {
-    if(s.feedback) parts.push(`=== ${name} ===\n\n${s.feedback}`);
-  }
-  if(!parts.length) { showNotification('No feedback generated yet.'); return; }
-  copyToClipboard(parts.join('\n\n---\n\n'));
 }
 
 function downloadStudentPDF() {
