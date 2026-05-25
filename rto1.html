@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RTO Feedback Tool</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1a18;
+    --paper: #f5f2ec;
+    --paper2: #ede9e0;
+    --rule: #c8c3b8;
+    --accent: #2d5a3d;
+    --accent-light: #e8f0ea;
+    --warn: #8b3a1a;
+    --warn-light: #fdf0eb;
+    --mono: 'DM Mono', monospace;
+    --serif: 'Fraunces', Georgia, serif;
+    --radius: 4px;
+  }
+
+  body {
+    font-family: var(--mono);
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  header {
+    border-bottom: 2px solid var(--ink);
+    padding: 20px 32px;
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  header h1 {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    color: var(--paper);
+  }
+
+  header span {
+    font-size: 11px;
+    opacity: 0.6;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .privacy-note {
+    background: var(--accent-light);
+    border-left: 3px solid var(--accent);
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .card {
+    border: 1.5px solid var(--rule);
+    border-radius: var(--radius);
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .card-header {
+    background: var(--paper2);
+    border-bottom: 1.5px solid var(--rule);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 11px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .step-num.done {
+    background: var(--accent);
+  }
+
+  .card-header h2 {
+    font-family: var(--serif);
+    font-size: 16px;
+    font-weight: 600;
+    flex: 1;
+  }
+
+  .card-body {
+    padding: 20px;
+  }
+
+  label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #666;
+    margin-bottom: 6px;
+  }
+
+  input[type="password"],
+  input[type="text"] {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--rule);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--paper);
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input:focus { border-color: var(--accent); }
+
+  .key-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .key-row input { flex: 1; }
+
+  .hint {
+    font-size: 11px;
+    color: #888;
+    margin-top: 6px;
+  }
+
+  .hint a { color: var(--accent); }
+
+  .upload-zone {
+    border: 2px dashed var(--rule);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    background: var(--paper);
+  }
+
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-zone .icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+
+  .upload-zone p {
+    font-size: 13px;
+    color: #666;
+  }
+
+  .upload-zone .filename {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+  .col-label {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--ink);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--rule);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--paper);
+    color: var(--ink);
+    resize: vertical;
+    min-height: 100px;
+    outline: none;
+    line-height: 1.6;
+    transition: border-color 0.15s;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+
+  .btn {
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .btn-primary:hover { background: #333; }
+  .btn-primary:disabled { background: #aaa; border-color: #aaa; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--rule);
+  }
+
+  .btn-ghost:hover { border-color: var(--ink); }
+
+  .btn-accent {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .btn-accent:hover { background: #234a30; }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  .status-bar {
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    display: none;
+  }
+
+  .status-bar.info { background: var(--accent-light); color: var(--accent); display: block; }
+  .status-bar.error { background: var(--warn-light); color: var(--warn); display: block; }
+  .status-bar.loading { background: #f0f0f0; color: #555; display: block; }
+
+  .spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .student-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .student-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+
+  .student-item:hover { border-color: var(--accent); background: var(--accent-light); }
+  .student-item.active { border-color: var(--accent); background: var(--accent-light); }
+
+  .student-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--rule);
+    flex-shrink: 0;
+  }
+
+  .student-dot.has-notes { background: var(--accent); }
+  .student-dot.has-feedback { background: var(--ink); }
+
+  .student-name { font-size: 13px; flex: 1; }
+  .student-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: var(--paper2);
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .student-badge.matched { background: var(--accent-light); color: var(--accent); }
+  .student-badge.feedback-done { background: var(--ink); color: var(--paper); }
+
+  .detail-panel {
+    display: none;
+  }
+
+  .detail-panel.visible { display: block; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 600px) { .detail-grid { grid-template-columns: 1fr; } }
+
+  .text-area-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #888;
+    margin-bottom: 6px;
+  }
+
+  .feedback-output {
+    background: var(--paper);
+    border: 1.5px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 16px;
+    font-size: 13px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    min-height: 120px;
+    font-family: var(--mono);
+  }
+
+  .feedback-output.empty {
+    color: #aaa;
+    font-style: italic;
+  }
+
+  .section-divider {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 20px 0;
+  }
+
+  .generate-all-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .progress-bar-wrap {
+    flex: 1;
+    min-width: 120px;
+    background: var(--paper2);
+    border-radius: 20px;
+    height: 6px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 20px;
+    width: 0%;
+    transition: width 0.3s;
+  }
+
+  .progress-label { font-size: 11px; color: #888; }
+
+  .unit-code-chip {
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--paper2);
+    border-radius: 20px;
+    font-size: 11px;
+    margin: 2px;
+    border: 1px solid var(--rule);
+  }
+
+  .collapsed { display: none !important; }
+
+  .toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    padding: 0;
+    text-decoration: underline;
+  }
+
+  .name-editor {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .name-editor input {
+    width: auto;
+    flex: 1;
+    min-width: 150px;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+
+  .tag-matched {
+    font-size: 10px;
+    padding: 2px 8px;
+    background: var(--accent-light);
+    color: var(--accent);
+    border-radius: 20px;
+    border: 1px solid var(--accent);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>RTO Feedback Tool</h1>
+  <span>Microbiology Assessment Marker</span>
+</header>
+
+<div class="privacy-note">
+  &#128274; PDFs are processed entirely in your browser. No student data is stored or sent to any server other than the Gemini API for OCR and feedback generation. Your API key is never saved.
+</div>
+
+<main>
+
+  <!-- STEP 1: API Key -->
+  <div class="card" id="card-key">
+    <div class="card-header">
+      <div class="step-num" id="step1-num">1</div>
+      <h2>Gemini API Key</h2>
+      <button class="toggle-btn" onclick="toggleCard('key-body')">hide</button>
+    </div>
+    <div class="card-body" id="key-body">
+      <label for="apikey">Your Gemini API key</label>
+      <div class="key-row">
+        <input type="password" id="apikey" placeholder="AIza..." autocomplete="off">
+        <button class="btn btn-ghost" onclick="toggleKeyVis()">show</button>
+        <button class="btn btn-primary" onclick="saveKey()">Save</button>
+      </div>
+      <p class="hint">Key stays in memory only — cleared when you close this tab. Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a></p>
+      <div id="key-status" class="status-bar" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Upload PDFs -->
+  <div class="card" id="card-upload">
+    <div class="card-header">
+      <div class="step-num" id="step2-num">2</div>
+      <h2>Upload PDFs</h2>
+      <button class="toggle-btn" onclick="toggleCard('upload-body')">hide</button>
+    </div>
+    <div class="card-body" id="upload-body">
+      <div class="two-col">
+        <div>
+          <div class="col-label">&#128196; Student answer sheets</div>
+          <div class="upload-zone" id="zone-answers" ondragover="dragOver(event,'zone-answers')" ondragleave="dragLeave('zone-answers')" ondrop="dropFile(event,'answers')">
+            <input type="file" accept=".pdf,image/*" multiple onchange="handleFile(event,'answers')">
+            <div class="icon">&#128196;</div>
+            <p>Drop PDF here or click to browse</p>
+            <div class="filename" id="fname-answers"></div>
+          </div>
+        </div>
+        <div>
+          <div class="col-label">&#128221; Your marking notes</div>
+          <div class="upload-zone" id="zone-notes" ondragover="dragOver(event,'zone-notes')" ondragleave="dragLeave('zone-notes')" ondrop="dropFile(event,'notes')">
+            <input type="file" accept=".pdf,image/*" multiple onchange="handleFile(event,'notes')">
+            <div class="icon">&#128221;</div>
+            <p>Drop PDF here or click to browse</p>
+            <div class="filename" id="fname-notes"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <label for="unit-context">Unit / assessment context (optional — baked into feedback prompt)</label>
+        <input type="text" id="unit-context" placeholder="e.g. PREMHS402A — identify microbes and diseases they cause, Cert III, encouraging tone">
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-extract" onclick="extractAll()" disabled>
+          &#128269; Extract &amp; Match Students
+        </button>
+      </div>
+      <div id="extract-status" class="status-bar" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Review & Generate -->
+  <div class="card" id="card-review" style="display:none;">
+    <div class="card-header">
+      <div class="step-num" id="step3-num">3</div>
+      <h2>Review &amp; Generate Feedback</h2>
+    </div>
+    <div class="card-body">
+
+      <div class="generate-all-row">
+        <button class="btn btn-accent" id="btn-gen-all" onclick="generateAll()">
+          &#9889; Generate all feedback
+        </button>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="gen-progress"></div>
+        </div>
+        <span class="progress-label" id="gen-label"></span>
+      </div>
+
+      <hr class="section-divider">
+
+      <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+        <!-- Student list sidebar -->
+        <div style="min-width:180px; flex:0 0 180px;">
+          <div class="text-area-label" style="margin-bottom:8px;">Students detected</div>
+          <div class="student-list" id="student-list"></div>
+        </div>
+
+        <!-- Detail panel -->
+        <div style="flex:1; min-width:0;" id="detail-panel">
+          <div id="no-selection" style="color:#aaa; font-size:13px; padding:20px 0;">
+            ← Select a student to review
+          </div>
+          <div id="student-detail" class="detail-panel">
+
+            <div class="name-editor">
+              <input type="text" id="detail-name" style="font-size:15px; font-weight:500; font-family:var(--serif);">
+              <span class="tag-matched" id="match-tag" style="display:none;">&#10003; Notes matched</span>
+              <button class="btn btn-ghost" style="padding:6px 12px; font-size:12px;" onclick="saveNameEdit()">Rename</button>
+            </div>
+
+            <div class="detail-grid">
+              <div>
+                <div class="text-area-label">Student answers (extracted)</div>
+                <textarea id="detail-answers" rows="8" placeholder="Extracted text will appear here — edit if needed"></textarea>
+              </div>
+              <div>
+                <div class="text-area-label">Your marking notes (extracted)</div>
+                <textarea id="detail-notes" rows="8" placeholder="No notes matched — paste manually if needed"></textarea>
+              </div>
+            </div>
+
+            <div class="btn-row" style="margin-top:4px;">
+              <button class="btn btn-primary" onclick="generateOne()">&#9889; Generate feedback for this student</button>
+            </div>
+
+            <div style="margin-top:16px;">
+              <div class="text-area-label">Generated feedback</div>
+              <div class="feedback-output empty" id="detail-feedback">Not yet generated.</div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn btn-accent" onclick="copyFeedback()">&#128203; Copy to clipboard</button>
+              <button class="btn btn-ghost" onclick="downloadStudentPDF()">&#8595; Download PDF</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <!-- Bulk download -->
+      <div>
+        <div class="text-area-label" style="margin-bottom:10px;">Bulk export</div>
+        <div class="btn-row" style="margin-top:0;">
+          <button class="btn btn-accent" onclick="downloadAllPDF()">&#8595; Download all feedback as PDF</button>
+          <button class="btn btn-ghost" onclick="copyAll()">&#128203; Copy all to clipboard</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let API_KEY = '';
+let students = {}; // { name: { answers, notes, feedback } }
+let currentStudent = null;
+let answersFiles = [];
+let notesFiles = [];
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+function setStatus(id, msg, type='info') {
+  const el = document.getElementById(id);
+  el.className = 'status-bar ' + type;
+  el.innerHTML = msg;
+}
+
+function clearStatus(id) {
+  const el = document.getElementById(id);
+  el.className = 'status-bar';
+}
+
+function toggleCard(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('collapsed');
+  const btn = el.previousElementSibling.querySelector('.toggle-btn');
+  if(btn) btn.textContent = el.classList.contains('collapsed') ? 'show' : 'hide';
+}
+
+function toggleKeyVis() {
+  const inp = document.getElementById('apikey');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function saveKey() {
+  const val = document.getElementById('apikey').value.trim();
+  if(!val) { setStatus('key-status','Please enter your API key.','error'); return; }
+  API_KEY = val;
+  setStatus('key-status','&#10003; Key saved for this session.','info');
+  document.getElementById('step1-num').classList.add('done');
+  checkExtractReady();
+}
+
+function checkExtractReady() {
+  const ready = API_KEY && (answersFiles.length > 0 || notesFiles.length > 0);
+  document.getElementById('btn-extract').disabled = !ready;
+}
+
+// ── File handling ──────────────────────────────────────────────────────────
+function dragOver(e, zoneId) { e.preventDefault(); document.getElementById(zoneId).classList.add('dragover'); }
+function dragLeave(zoneId) { document.getElementById(zoneId).classList.remove('dragover'); }
+
+function dropFile(e, type) {
+  e.preventDefault();
+  const zoneId = type === 'answers' ? 'zone-answers' : 'zone-notes';
+  dragLeave(zoneId);
+  const files = Array.from(e.dataTransfer.files);
+  assignFiles(files, type);
+}
+
+function handleFile(e, type) {
+  const files = Array.from(e.target.files);
+  assignFiles(files, type);
+}
+
+function assignFiles(files, type) {
+  const label = type === 'answers' ? 'fname-answers' : 'fname-notes';
+  if(type === 'answers') answersFiles = files;
+  else notesFiles = files;
+  document.getElementById(label).textContent = files.map(f=>f.name).join(', ');
+  checkExtractReady();
+}
+
+// ── PDF → base64 pages ─────────────────────────────────────────────────────
+async function pdfToBase64Pages(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  const pages = [];
+  for(let i=1; i<=pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({scale: 2.0});
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({canvasContext: ctx, viewport}).promise;
+    const b64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    pages.push(b64);
+  }
+  return pages;
+}
+
+async function imageToBase64(file) {
+  return new Promise((res) => {
+    const reader = new FileReader();
+    reader.onload = e => res(e.target.result.split(',')[1]);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function filesToBase64Pages(files) {
+  let allPages = [];
+  for(const f of files) {
+    if(f.type === 'application/pdf') {
+      allPages = allPages.concat(await pdfToBase64Pages(f));
+    } else {
+      allPages.push(await imageToBase64(f));
+    }
+  }
+  return allPages;
+}
+
+// ── Gemini call ────────────────────────────────────────────────────────────
+async function geminiVision(systemPrompt, imagePages) {
+  const parts = [{text: systemPrompt}];
+  for(const b64 of imagePages) {
+    parts.push({inline_data: {mime_type:'image/jpeg', data: b64}});
+  }
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+    {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({contents:[{parts}]})
+    }
+  );
+  if(!resp.ok) {
+    const err = await resp.json();
+    throw new Error(err.error?.message || 'API error');
+  }
+  const data = await resp.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// ── Extract & Match ────────────────────────────────────────────────────────
+async function extractAll() {
+  if(!API_KEY) { setStatus('extract-status','Save your API key first.','error'); return; }
+
+  setStatus('extract-status','<span class="spinner"></span> Reading student answer sheets...','loading');
+  students = {};
+
+  try {
+    // Extract answers
+    if(answersFiles.length > 0) {
+      const answerPages = await filesToBase64Pages(answersFiles);
+      const answerPrompt = `You are processing scanned student assessment answer sheets for an RTO (Registered Training Organisation).
+
+Your task:
+1. Identify each distinct student in these pages by their name (look for names written at the top of each section, on headers, or clearly labelling their work).
+2. Extract ALL text written by each student — their answers, responses, any work shown.
+3. Return ONLY valid JSON in this exact format:
+{
+  "students": [
+    {
+      "name": "FirstName LastName",
+      "answers": "Full extracted text of this student's answers, preserving structure as best you can."
+    }
+  ]
+}
+
+If you cannot determine a student name, use "Unknown Student N" where N is a number.
+Return ONLY the JSON object, no preamble, no markdown fences.`;
+
+      const answerRaw = await geminiVision(answerPrompt, answerPages);
+      const cleaned = answerRaw.replace(/```json|```/g,'').trim();
+      const answerData = JSON.parse(cleaned);
+      for(const s of answerData.students) {
+        const key = s.name.trim();
+        students[key] = { answers: s.answers, notes: '', feedback: '' };
+      }
+    }
+
+    // Extract notes
+    if(notesFiles.length > 0) {
+      setStatus('extract-status','<span class="spinner"></span> Reading your marking notes...','loading');
+      const notePages = await filesToBase64Pages(notesFiles);
+      const notesPrompt = `You are reading a teacher's handwritten marking notes for RTO student assessments.
+
+Your task:
+1. Identify each student's name that appears in the notes.
+2. Extract all comments, marks, observations, and feedback notes written by the teacher for each student.
+3. Return ONLY valid JSON in this exact format:
+{
+  "notes": [
+    {
+      "name": "FirstName LastName",
+      "notes": "All teacher notes for this student."
+    }
+  ]
+}
+
+Return ONLY the JSON object, no preamble, no markdown fences.`;
+
+      const notesRaw = await geminiVision(notesPrompt, notePages);
+      const cleanedN = notesRaw.replace(/```json|```/g,'').trim();
+      const notesData = JSON.parse(cleanedN);
+
+      // Match notes to students (fuzzy: lowercase, partial match)
+      for(const n of notesData.notes) {
+        const noteName = n.name.trim().toLowerCase();
+        let matched = null;
+        for(const sName of Object.keys(students)) {
+          if(sName.toLowerCase().includes(noteName) || noteName.includes(sName.toLowerCase())) {
+            matched = sName; break;
+          }
+        }
+        if(matched) {
+          students[matched].notes = n.notes;
+        } else {
+          // Add as unmatched student
+          students[n.name.trim()] = { answers: '', notes: n.notes, feedback: '' };
+        }
+      }
+    }
+
+    renderStudentList();
+    document.getElementById('card-review').style.display = 'block';
+    document.getElementById('step2-num').classList.add('done');
+    setStatus('extract-status', `&#10003; Found ${Object.keys(students).length} student(s). Scroll down to review.`, 'info');
+    document.getElementById('card-review').scrollIntoView({behavior:'smooth', block:'start'});
+
+  } catch(err) {
+    setStatus('extract-status', '&#9888; Error: ' + err.message, 'error');
+  }
+}
+
+// ── Render student list ────────────────────────────────────────────────────
+function renderStudentList() {
+  const list = document.getElementById('student-list');
+  list.innerHTML = '';
+  for(const name of Object.keys(students)) {
+    const s = students[name];
+    const item = document.createElement('div');
+    item.className = 'student-item' + (name === currentStudent ? ' active' : '');
+    item.onclick = () => selectStudent(name);
+    const dot = document.createElement('div');
+    dot.className = 'student-dot' + (s.feedback ? ' has-feedback' : s.notes ? ' has-notes' : '');
+    const nameEl = document.createElement('div');
+    nameEl.className = 'student-name';
+    nameEl.textContent = name;
+    const badge = document.createElement('div');
+    badge.className = 'student-badge' + (s.feedback ? ' feedback-done' : s.notes ? ' matched' : '');
+    badge.textContent = s.feedback ? 'done' : s.notes ? 'matched' : 'answers';
+    item.appendChild(dot);
+    item.appendChild(nameEl);
+    item.appendChild(badge);
+    list.appendChild(item);
+  }
+}
+
+function selectStudent(name) {
+  currentStudent = name;
+  const s = students[name];
+  document.getElementById('no-selection').style.display = 'none';
+  const detail = document.getElementById('student-detail');
+  detail.classList.add('visible');
+  document.getElementById('detail-name').value = name;
+  document.getElementById('detail-answers').value = s.answers || '';
+  document.getElementById('detail-notes').value = s.notes || '';
+  const fb = document.getElementById('detail-feedback');
+  if(s.feedback) { fb.textContent = s.feedback; fb.classList.remove('empty'); }
+  else { fb.textContent = 'Not yet generated.'; fb.classList.add('empty'); }
+  const matchTag = document.getElementById('match-tag');
+  matchTag.style.display = s.notes ? 'inline-block' : 'none';
+  renderStudentList();
+}
+
+function saveNameEdit() {
+  if(!currentStudent) return;
+  const newName = document.getElementById('detail-name').value.trim();
+  if(!newName || newName === currentStudent) return;
+  students[newName] = students[currentStudent];
+  delete students[currentStudent];
+  currentStudent = newName;
+  renderStudentList();
+}
+
+// ── Generate feedback ──────────────────────────────────────────────────────
+function buildPrompt(name, answers, notes) {
+  const ctx = document.getElementById('unit-context').value.trim();
+  const contextLine = ctx ? `Assessment context: ${ctx}` : 'Assessment context: Microbiology — identifying microbes and diseases they cause. RTO/VET setting.';
+  return `You are an experienced RTO assessor writing formal but encouraging feedback for a student assessment.
+
+${contextLine}
+Student name: ${name}
+
+Student's written answers:
+---
+${answers || '(No answers extracted — base feedback on notes only)'}
+---
+
+Assessor's marking notes:
+---
+${notes || '(No notes provided — base feedback on student answers only)'}
+---
+
+Write a professional RTO-style narrative feedback for this student. Include:
+1. A brief acknowledgement of what the student demonstrated understanding of
+2. Specific strengths observed in their answers or noted by the assessor
+3. Areas for improvement or gaps to address, with constructive guidance
+4. A clear overall comment on their performance
+
+Write in second person ("You demonstrated...", "Your response showed..."). 
+Tone: professional, encouraging, specific. Length: 150–250 words.
+Do NOT include a competency judgement (C/NYC) — the assessor will add that separately.
+Do NOT add a header or student name at the top — just the feedback paragraphs.`;
+}
+
+async function generateOne() {
+  if(!currentStudent) return;
+  if(!API_KEY) { alert('Save your API key first.'); return; }
+  const s = students[currentStudent];
+  s.answers = document.getElementById('detail-answers').value;
+  s.notes = document.getElementById('detail-notes').value;
+
+  const fb = document.getElementById('detail-feedback');
+  fb.textContent = 'Generating...';
+  fb.classList.remove('empty');
+
+  try {
+    const prompt = buildPrompt(currentStudent, s.answers, s.notes);
+    const result = await geminiVision(prompt, []);
+    s.feedback = result.trim();
+    fb.textContent = s.feedback;
+    renderStudentList();
+    document.getElementById('step3-num').classList.add('done');
+  } catch(err) {
+    fb.textContent = 'Error: ' + err.message;
+    fb.classList.add('empty');
+  }
+}
+
+async function generateAll() {
+  if(!API_KEY) { alert('Save your API key first.'); return; }
+  const names = Object.keys(students);
+  const bar = document.getElementById('gen-progress');
+  const label = document.getElementById('gen-label');
+  for(let i=0; i<names.length; i++) {
+    const name = names[i];
+    label.textContent = `${name} (${i+1}/${names.length})`;
+    bar.style.width = ((i/names.length)*100)+'%';
+    const s = students[name];
+    try {
+      const prompt = buildPrompt(name, s.answers, s.notes);
+      s.feedback = (await geminiVision(prompt, [])).trim();
+    } catch(e) {
+      s.feedback = '[Error generating: ' + e.message + ']';
+    }
+    if(name === currentStudent) selectStudent(name);
+    renderStudentList();
+  }
+  bar.style.width = '100%';
+  label.textContent = `Done — ${names.length} student(s)`;
+  document.getElementById('step3-num').classList.add('done');
+}
+
+// ── Feedback text-only API call (no image) ─────────────────────────────────
+// Override geminiVision to handle text-only calls
+const _geminiVision = geminiVision;
+async function geminiVision(systemPrompt, imagePages) {
+  const parts = [];
+  if(systemPrompt) parts.push({text: systemPrompt});
+  for(const b64 of imagePages) {
+    parts.push({inline_data: {mime_type:'image/jpeg', data: b64}});
+  }
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+    {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({contents:[{parts}]})
+    }
+  );
+  if(!resp.ok) {
+    const err = await resp.json();
+    throw new Error(err.error?.message || 'Gemini API error ' + resp.status);
+  }
+  const data = await resp.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// ── Output ─────────────────────────────────────────────────────────────────
+function copyFeedback() {
+  if(!currentStudent) return;
+  const text = students[currentStudent].feedback;
+  if(!text) { alert('No feedback generated yet.'); return; }
+  navigator.clipboard.writeText(text).then(()=>alert('Copied to clipboard!')).catch(()=>{
+    prompt('Copy this text:', text);
+  });
+}
+
+function copyAll() {
+  const parts = [];
+  for(const [name, s] of Object.entries(students)) {
+    if(s.feedback) parts.push(`=== ${name} ===\n\n${s.feedback}`);
+  }
+  if(!parts.length) { alert('No feedback generated yet.'); return; }
+  navigator.clipboard.writeText(parts.join('\n\n---\n\n')).then(()=>alert('All feedback copied!')).catch(()=>{
+    prompt('Copy this text:', parts.join('\n\n---\n\n'));
+  });
+}
+
+function downloadStudentPDF() {
+  if(!currentStudent) return;
+  const s = students[currentStudent];
+  if(!s.feedback) { alert('Generate feedback first.'); return; }
+  makePDF([{name: currentStudent, feedback: s.feedback}]);
+}
+
+function downloadAllPDF() {
+  const items = [];
+  for(const [name, s] of Object.entries(students)) {
+    if(s.feedback) items.push({name, feedback: s.feedback});
+  }
+  if(!items.length) { alert('No feedback generated yet.'); return; }
+  makePDF(items);
+}
+
+function makePDF(items) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, margin = 20, contentW = W - margin*2;
+  const ctx = document.getElementById('unit-context').value.trim() || 'Microbiology Assessment';
+
+  items.forEach((item, idx) => {
+    if(idx > 0) doc.addPage();
+
+    // Header bar
+    doc.setFillColor(26,26,24);
+    doc.rect(0, 0, 210, 22, 'F');
+    doc.setTextColor(245,242,236);
+    doc.setFont('times','bold');
+    doc.setFontSize(14);
+    doc.text('RTO Assessment Feedback', margin, 13);
+    doc.setFont('courier','normal');
+    doc.setFontSize(8);
+    doc.text(new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'long',year:'numeric'}), W-margin, 13, {align:'right'});
+
+    // Student name
+    doc.setTextColor(26,26,24);
+    doc.setFont('times','bold');
+    doc.setFontSize(16);
+    doc.text(item.name, margin, 36);
+
+    // Context tag
+    doc.setFont('courier','normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100,100,100);
+    doc.text(ctx, margin, 43);
+
+    // Divider
+    doc.setDrawColor(200,195,184);
+    doc.setLineWidth(0.4);
+    doc.line(margin, 47, W-margin, 47);
+
+    // Feedback body
+    doc.setTextColor(26,26,24);
+    doc.setFont('times','normal');
+    doc.setFontSize(11);
+    const lines = doc.splitTextToSize(item.feedback, contentW);
+    let y = 55;
+    for(const line of lines) {
+      if(y > 270) { doc.addPage(); y = margin; }
+      doc.text(line, margin, y);
+      y += 6;
+    }
+
+    // Footer
+    doc.setFont('courier','normal');
+    doc.setFontSize(8);
+    doc.setTextColor(160,160,160);
+    doc.text('Generated with RTO Feedback Tool — Assessor signature: ___________________________', margin, 285);
+  });
+
+  const fname = items.length === 1 ? `feedback_${items[0].name.replace(/\s+/g,'_')}.pdf` : 'rto_feedback_all.pdf';
+  doc.save(fname);
+}
+</script>
+</body>
+</html>
