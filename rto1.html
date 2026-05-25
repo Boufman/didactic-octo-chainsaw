@@ -7,6 +7,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
+  /* ========================================================================
+    PART 1: UI STRUCTURE, THEME & STYLING
+    ========================================================================
+  */
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -476,6 +480,23 @@
     border-radius: 20px;
     border: 1px solid var(--accent);
   }
+
+  /* Custom Toast Notification */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 12px 24px;
+    border-radius: var(--radius);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    font-family: var(--mono);
+    font-size: 13px;
+    z-index: 1000;
+    display: none;
+    transition: opacity 0.3s ease;
+  }
 </style>
 </head>
 <body>
@@ -583,7 +604,7 @@
         <!-- Detail panel -->
         <div style="flex:1; min-width:0;" id="detail-panel">
           <div id="no-selection" style="color:#aaa; font-size:13px; padding:20px 0;">
-            ← Select a student to review
+            &larr; Select a student to review
           </div>
           <div id="student-detail" class="detail-panel">
 
@@ -637,17 +658,45 @@
 
 </main>
 
+<div id="toast-notification" class="toast"></div>
+
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// ── State ──────────────────────────────────────────────────────────────────
+/* ========================================================================
+  PART 2: APPLICATION STATE, DRAG-AND-DROP & PDF OCR PROCESSING
+  ========================================================================
+*/
 let API_KEY = '';
 let students = {}; // { name: { answers, notes, feedback } }
 let currentStudent = null;
 let answersFiles = [];
 let notesFiles = [];
 
-// ── Utilities ──────────────────────────────────────────────────────────────
+// Safe markdown parser that avoids clashing with text editors and markdown renderers
+function cleanJsonMarkdown(raw) {
+  const tripleBackticks = String.fromCharCode(96, 96, 96);
+  let cleaned = raw.trim();
+  if (cleaned.startsWith(tripleBackticks + "json")) {
+    cleaned = cleaned.slice(7);
+  } else if (cleaned.startsWith(tripleBackticks)) {
+    cleaned = cleaned.slice(3);
+  }
+  if (cleaned.endsWith(tripleBackticks)) {
+    cleaned = cleaned.slice(0, -3);
+  }
+  return cleaned.trim();
+}
+
+function showNotification(msg) {
+  const toast = document.getElementById('toast-notification');
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => {
+    toast.style.display = 'none';
+  }, 3000);
+}
+
 function setStatus(id, msg, type='info') {
   const el = document.getElementById(id);
   el.className = 'status-bar ' + type;
@@ -685,7 +734,6 @@ function checkExtractReady() {
   document.getElementById('btn-extract').disabled = !ready;
 }
 
-// ── File handling ──────────────────────────────────────────────────────────
 function dragOver(e, zoneId) { e.preventDefault(); document.getElementById(zoneId).classList.add('dragover'); }
 function dragLeave(zoneId) { document.getElementById(zoneId).classList.remove('dragover'); }
 
@@ -710,7 +758,6 @@ function assignFiles(files, type) {
   checkExtractReady();
 }
 
-// ── PDF → base64 pages ─────────────────────────────────────────────────────
 async function pdfToBase64Pages(file) {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
@@ -749,21 +796,44 @@ async function filesToBase64Pages(files) {
   return allPages;
 }
 
-// ── Gemini call ────────────────────────────────────────────────────────────
-async function geminiVision(systemPrompt, imagePages) {
+async function fetchWithBackoff(url, options) {
+  let delay = 1000;
+  for (let i = 0; i < 5; i++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
+        throw new Error(`HTTP status error: ${response.status}`);
+      }
+      return response;
+    } catch (err) {
+      if (i === 4) throw err;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 2; 
+    }
+  }
+}
+
+async function geminiVision(systemPrompt, imagePages = []) {
   const parts = [];
   if(systemPrompt) parts.push({text: systemPrompt});
-  for(const b64 of imagePages) {
-    parts.push({inline_data: {mime_type:'image/jpeg', data: b64}});
+  
+  if (imagePages && imagePages.length > 0) {
+    for(const b64 of imagePages) {
+      parts.push({inlineData: {mimeType:'image/jpeg', data: b64}});
+    }
+  } else {
+    parts.push({text: "Verify structural alignment."});
   }
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview:generateContent?key=${API_KEY}`,
+
+  const resp = await fetchWithBackoff(
+    `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
     {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({contents:[{parts}]})
     }
   );
+  
   if(!resp.ok) {
     const err = await resp.json();
     throw new Error(err.error?.message || 'API error');
@@ -772,7 +842,6 @@ async function geminiVision(systemPrompt, imagePages) {
   return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
-// ── Extract & Match ────────────────────────────────────────────────────────
 async function extractAll() {
   if(!API_KEY) { setStatus('extract-status','Save your API key first.','error'); return; }
 
@@ -780,7 +849,6 @@ async function extractAll() {
   students = {};
 
   try {
-    // Extract answers
     if(answersFiles.length > 0) {
       const answerPages = await filesToBase64Pages(answersFiles);
       const answerPrompt = `You are processing scanned student assessment answer sheets for an RTO (Registered Training Organisation).
@@ -802,7 +870,7 @@ If you cannot determine a student name, use "Unknown Student N" where N is a num
 Return ONLY the JSON object, no preamble, no markdown fences.`;
 
       const answerRaw = await geminiVision(answerPrompt, answerPages);
-      const cleaned = answerRaw.replace(/```json|```/g,'').trim();
+      const cleaned = cleanJsonMarkdown(answerRaw);
       const answerData = JSON.parse(cleaned);
       for(const s of answerData.students) {
         const key = s.name.trim();
@@ -810,7 +878,6 @@ Return ONLY the JSON object, no preamble, no markdown fences.`;
       }
     }
 
-    // Extract notes
     if(notesFiles.length > 0) {
       setStatus('extract-status','<span class="spinner"></span> Reading your marking notes...','loading');
       const notePages = await filesToBase64Pages(notesFiles);
@@ -832,10 +899,9 @@ Your task:
 Return ONLY the JSON object, no preamble, no markdown fences.`;
 
       const notesRaw = await geminiVision(notesPrompt, notePages);
-      const cleanedN = notesRaw.replace(/```json|```/g,'').trim();
+      const cleanedN = cleanJsonMarkdown(notesRaw);
       const notesData = JSON.parse(cleanedN);
 
-      // Match notes to students (fuzzy: lowercase, partial match)
       for(const n of notesData.notes) {
         const noteName = n.name.trim().toLowerCase();
         let matched = null;
@@ -847,7 +913,6 @@ Return ONLY the JSON object, no preamble, no markdown fences.`;
         if(matched) {
           students[matched].notes = n.notes;
         } else {
-          // Add as unmatched student
           students[n.name.trim()] = { answers: '', notes: n.notes, feedback: '' };
         }
       }
@@ -864,7 +929,10 @@ Return ONLY the JSON object, no preamble, no markdown fences.`;
   }
 }
 
-// ── Render student list ────────────────────────────────────────────────────
+/* ========================================================================
+  PART 3: NARRATIVE GENERATION, BULK RUNS & PDF EXPORT UTILITIES
+  ========================================================================
+*/
 function renderStudentList() {
   const list = document.getElementById('student-list');
   list.innerHTML = '';
@@ -915,7 +983,6 @@ function saveNameEdit() {
   renderStudentList();
 }
 
-// ── Generate feedback ──────────────────────────────────────────────────────
 function buildPrompt(name, answers, notes) {
   const ctx = document.getElementById('unit-context').value.trim();
   const contextLine = ctx ? `Assessment context: ${ctx}` : 'Assessment context: Microbiology — identifying microbes and diseases they cause. RTO/VET setting.';
@@ -948,7 +1015,7 @@ Do NOT add a header or student name at the top — just the feedback paragraphs.
 
 async function generateOne() {
   if(!currentStudent) return;
-  if(!API_KEY) { alert('Save your API key first.'); return; }
+  if(!API_KEY) { showNotification('Save your API key first.'); return; }
   const s = students[currentStudent];
   s.answers = document.getElementById('detail-answers').value;
   s.notes = document.getElementById('detail-notes').value;
@@ -971,7 +1038,7 @@ async function generateOne() {
 }
 
 async function generateAll() {
-  if(!API_KEY) { alert('Save your API key first.'); return; }
+  if(!API_KEY) { showNotification('Save your API key first.'); return; }
   const names = Object.keys(students);
   const bar = document.getElementById('gen-progress');
   const label = document.getElementById('gen-label');
@@ -994,16 +1061,41 @@ async function generateAll() {
   document.getElementById('step3-num').classList.add('done');
 }
 
+function copyToClipboard(text) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.top = "0";
+  textArea.style.left = "0";
+  textArea.style.width = "2em";
+  textArea.style.height = "2em";
+  textArea.style.padding = "0";
+  textArea.style.border = "none";
+  textArea.style.outline = "none";
+  textArea.style.boxShadow = "none";
+  textArea.style.background = "transparent";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  
+  try {
+    const successful = document.execCommand('copy');
+    if (successful) {
+      showNotification('Successfully copied to clipboard!');
+    } else {
+      showNotification('Unable to copy automatically.');
+    }
+  } catch (err) {
+    showNotification('Copy failed.');
+  }
+  document.body.removeChild(textArea);
+}
 
-
-// ── Output ─────────────────────────────────────────────────────────────────
 function copyFeedback() {
   if(!currentStudent) return;
   const text = students[currentStudent].feedback;
-  if(!text) { alert('No feedback generated yet.'); return; }
-  navigator.clipboard.writeText(text).then(()=>alert('Copied to clipboard!')).catch(()=>{
-    prompt('Copy this text:', text);
-  });
+  if(!text) { showNotification('No feedback generated yet.'); return; }
+  copyToClipboard(text);
 }
 
 function copyAll() {
@@ -1011,16 +1103,14 @@ function copyAll() {
   for(const [name, s] of Object.entries(students)) {
     if(s.feedback) parts.push(`=== ${name} ===\n\n${s.feedback}`);
   }
-  if(!parts.length) { alert('No feedback generated yet.'); return; }
-  navigator.clipboard.writeText(parts.join('\n\n---\n\n')).then(()=>alert('All feedback copied!')).catch(()=>{
-    prompt('Copy this text:', parts.join('\n\n---\n\n'));
-  });
+  if(!parts.length) { showNotification('No feedback generated yet.'); return; }
+  copyToClipboard(parts.join('\n\n---\n\n'));
 }
 
 function downloadStudentPDF() {
   if(!currentStudent) return;
   const s = students[currentStudent];
-  if(!s.feedback) { alert('Generate feedback first.'); return; }
+  if(!s.feedback) { showNotification('Generate feedback first.'); return; }
   makePDF([{name: currentStudent, feedback: s.feedback}]);
 }
 
@@ -1029,7 +1119,7 @@ function downloadAllPDF() {
   for(const [name, s] of Object.entries(students)) {
     if(s.feedback) items.push({name, feedback: s.feedback});
   }
-  if(!items.length) { alert('No feedback generated yet.'); return; }
+  if(!items.length) { showNotification('No feedback generated yet.'); return; }
   makePDF(items);
 }
 
@@ -1042,7 +1132,6 @@ function makePDF(items) {
   items.forEach((item, idx) => {
     if(idx > 0) doc.addPage();
 
-    // Header bar
     doc.setFillColor(26,26,24);
     doc.rect(0, 0, 210, 22, 'F');
     doc.setTextColor(245,242,236);
@@ -1053,24 +1142,20 @@ function makePDF(items) {
     doc.setFontSize(8);
     doc.text(new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'long',year:'numeric'}), W-margin, 13, {align:'right'});
 
-    // Student name
     doc.setTextColor(26,26,24);
     doc.setFont('times','bold');
     doc.setFontSize(16);
     doc.text(item.name, margin, 36);
 
-    // Context tag
     doc.setFont('courier','normal');
     doc.setFontSize(9);
     doc.setTextColor(100,100,100);
     doc.text(ctx, margin, 43);
 
-    // Divider
     doc.setDrawColor(200,195,184);
     doc.setLineWidth(0.4);
     doc.line(margin, 47, W-margin, 47);
 
-    // Feedback body
     doc.setTextColor(26,26,24);
     doc.setFont('times','normal');
     doc.setFontSize(11);
@@ -1082,7 +1167,6 @@ function makePDF(items) {
       y += 6;
     }
 
-    // Footer
     doc.setFont('courier','normal');
     doc.setFontSize(8);
     doc.setTextColor(160,160,160);
