@@ -853,9 +853,9 @@ async function extractAll() {
 Your task:
 1. Identify each distinct student in these pages by their name (look for written names at the top of pages or on header lines).
 2. Extract ALL written answers for Part 2:
-   - Micro-organism identification (what biological organism is seen in the microscope images)
+   - Micro-organism identification (what biological organism is seen in the microscope images, e.g., E. coli, Herpes, Neisseria gonorrhoeae, Mycobacterium tuberculosis)
    - Biological type (bacteria, virus, fungi, etc.)
-   - Biological structures named
+   - Biological structures named (viral morphology, bacterial arrangements like cocci in pairs, etc.)
    - Diseases caused by this micro-organism
 3. Return ONLY valid JSON in this exact format in English UK spelling:
 {
@@ -891,7 +891,7 @@ Your task:
    - Cleaning up a soiled surface starting with detergent, followed by disinfectant
    - Demonstrating handwashing using the WHO protocol
    - Sterilising a wound on the patient's hand with a small swab
-   - Answering the question on 3 things they can do to prevent transmitting microbes to patients
+   - Answering the question on 3 things they can do to prevent transmitting microbes to patients (e.g. personal protective equipment like masks, gloves, hand sanitiser/sanitising)
 3. Return ONLY valid JSON in this exact format in English UK spelling:
 {
   "notes": [
@@ -1020,7 +1020,7 @@ The tasks the student carried out are:
 2. Cleaning up a soiled surface starting with the detergent, and then the disinfectant.
 3. Demonstrating handwashing using the correct WHO hand hygiene protocol.
 4. Sterilising a wound on the student/patient's hand with a small swab.
-5. Answering a question about three things they can do to stop passing microbes on to their patient.
+5. Answering a question about three things they can do to stop passing microbes on to their patient (such as listing personal protective equipment like masks, gloves, or sanitising).
 ---
 Teacher notes on missed/successful tasks:
 ${notes || '(No specific teacher notes uploaded. Assume overall compliance but note any details if available.)'}
@@ -1028,26 +1028,26 @@ ${notes || '(No specific teacher notes uploaded. Assume overall compliance but n
 
 Part 2: Microscopy and Identification (Based on Student's Written Answers):
 The student sat in front of microscope images to carry out:
-1. Identifying the micro-organism.
-2. Determining which biological type it is.
-3. Naming one structure of this micro-organism.
-4. Naming one disease caused by it.
+1. Identifying the micro-organism (e.g. E. coli, Herpes, Neisseria gonorrhoeae, Mycobacterium tuberculosis).
+2. Determining which biological type it is (bacteria, virus, etc.).
+3. Naming one structure of this micro-organism (e.g. viral morphology, bacterial arrangements like cocci in pairs, etc.).
+4. Naming one disease caused by it (e.g. Mycobacterium tuberculosis causing tuberculosis).
 ---
 Student answers:
 ${answers || '(No student answers extracted. Base microscope evaluation on notes.)'}
 ---
 
 Write a professional RTO-style feedback report for this student using British/Australian English (UK).
-Structure the feedback into paragraphs covering:
-1. Acknowledge and evaluate how they performed in Part 1 (Practical Skills), identifying any steps they missed (e.g., hand sanitising first, detergent-then-disinfectant sequence, WHO handwashing, patient swabbing, or transmission prevention question).
-2. Evaluate their performance in Part 2 (Microscopy & Identification), detailing their identification of the micro-organism, its type, cellular structure, and the disease it causes.
-3. Provide encouraging but constructive guidance on any gaps.
-4. Conclude with a warm overall performance summary.
+You MUST structure the feedback EXACTLY like this layout (two distinct sections, without using markdown bold headers like '###' or titles like 'Student Name'):
 
-Write in the second person ("You demonstrated...", "Your response showed...").
-Tone: encouraging, constructive, professional. Word count: 150–250 words.
-Do NOT include a formal competent/not yet competent decision (C/NYC) — the assessor handles that elsewhere.
-Do NOT add titles or headers like "Student Name:" at the top — output only the feedback paragraphs.`;
+"You were able to correctly identify several microorganisms: [List the microorganisms identified correctly, e.g., E. coli, Herpes, Neisseria gonorrhoeae, and Mycobacterium tuberculosis], along with their types (bacteria or virus). Furthermore, you accurately identified key personal protective equipment and hygiene practices vital for preventing transmission, specifically listing [List correct transmission preventative listings, e.g., masks, gloves, and sanitising], which is excellent.
+
+Things to correct:
+1. [Explain sequence corrections, e.g., the correct sequence for laboratory cleaning procedures. State that they were meant to start with detergent before disinfectant to ensure effective decontamination and safety if notes or answers show they got this wrong].
+2. [Explain terminology corrections, e.g., specific microbiological terms when describing microorganism structures for viral morphology and bacterial arrangements like cocci in pairs if notes or answers show they got this wrong].
+3. [Explain disease/transmission identification corrections, e.g., ensure you differentiate between the name of a disease and its mode of transmission, and accurately recall the specific diseases caused by identified pathogens, such as Mycobacterium tuberculosis if notes or answers show they got this wrong]."
+
+If the student performed any step perfectly, adapt the corrective items dynamically to either praise them or replace them with a constructive note. Keep the tone encouraging, constructive, and professional. Do NOT include a competency decision (C/NYC). Word count: 120-200 words.`;
 }
 
 async function generateOne() {
